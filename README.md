@@ -1,10 +1,10 @@
 # Pixel 6a Backup Tool
 
-A Python script to backup your Pixel 6a phone to Google Drive using ADB (Android Debug Bridge) and BetterADBSync.
+A Python script to backup your Pixel 6a phone to a directory using ADB (Android Debug Bridge) and BetterADBSync.
 
 ## Overview
 
-This tool automates the process of backing up your Pixel 6a's internal storage to Google Drive. It uses ADB to communicate with your phone and BetterADBSync to efficiently synchronize files while excluding hidden system files.
+This tool automates the process of backing up your Pixel 6a's internal storage to destination path. It uses ADB to communicate with your phone and BetterADBSync to efficiently synchronize files while excluding hidden system files.
 
 ## Prerequisites
 
@@ -12,7 +12,6 @@ This tool automates the process of backing up your Pixel 6a's internal storage t
 - **ADB (Android Debug Bridge)** installed and added to your system PATH
 - **BetterADBSync** Python package
 - **USB Debugging** enabled on your Pixel 6a
-- **Google Drive** mounted or accessible at the destination path
 
 ### Installing Dependencies
 
@@ -35,9 +34,9 @@ This tool automates the process of backing up your Pixel 6a's internal storage t
 - Enable "USB debugging"
 
 2. **Configure the backup destination**:
-- Edit `backup_phone.py` and update the `destination` variable to match your Google Drive path:
+- Edit `backup_phone.py` and update the `destination` variable to match your destination path:
      ```python
-     destination = "/g/My Drive/Backup-Pixel6a"  # Update this path as needed
+     destination = "/d/downloads/Backup-Pixel6a"  # Update this path as needed
      ```
 
 3. **Connect your phone**:
@@ -54,7 +53,7 @@ python backup_phone.py
 
 The script will:
 1. Check if your Pixel 6a is connected via ADB
-2. Sync all files from `/sdcard/` to your specified Google Drive folder
+2. Sync all files from `/sdcard/` to your specified folder
 3. Exclude hidden system files (files starting with `.`)
 4. Display real-time progress
 5. Report completion status
@@ -68,7 +67,7 @@ Press `Ctrl+C` to cancel the backup operation at any time.
 You can modify the following settings in `backup_phone.py`:
 
 - **`source`**: The path on your phone to backup (default: `//sdcard/`)
-- **`destination`**: The local path where backups are saved (default: `/g/My Drive/Backup-Pixel6a`)
+- **`destination`**: The local path where backups are saved (default: `/d/downloads/Backup-Pixel6a`)
 - **`--exclude` pattern**: Modify the exclusion pattern to skip different file types
 
 ## Troubleshooting
