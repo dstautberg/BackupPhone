@@ -1,16 +1,17 @@
 # Pixel 6a Backup Tool
 
-A Python script to backup your Pixel 6a phone to a directory using ADB (Android Debug Bridge) and BetterADBSync.
+A Python script to backup your Pixel 6a phone to a local directory using ADB (Android Debug Bridge) and BetterADBSync.
 
 ## Overview
 
-This tool automates the process of backing up your Pixel 6a's internal storage to destination path. It uses ADB to communicate with your phone and BetterADBSync to efficiently synchronize files while excluding hidden system files.
+This tool automates the process of backing up your Pixel 6a's internal storage to a destination folder. It uses ADB to communicate with your phone and BetterADBSync to efficiently synchronize files while excluding hidden system files.
 
 ## Prerequisites
 
 - **Python 3.6+** installed on your system
 - **ADB (Android Debug Bridge)** installed and added to your system PATH
-- **BetterADBSync** Python package
+- **BetterADBSync** Python package (`adbsync` command)
+- **python-dotenv** for configuration management
 - **USB Debugging** enabled on your Pixel 6a
 
 ### Installing Dependencies
@@ -20,9 +21,9 @@ This tool automates the process of backing up your Pixel 6a's internal storage t
    - **macOS**: `brew install android-platform-tools`
    - **Linux**: `sudo apt-get install adb` (Ubuntu/Debian)
 
-2. Install BetterADBSync:
+2. Install Python packages:
    ```
-   pip install BetterADBSync
+   pip install BetterADBSync python-dotenv
    ```
 
 ## Setup
@@ -34,10 +35,15 @@ This tool automates the process of backing up your Pixel 6a's internal storage t
 - Enable "USB debugging"
 
 2. **Configure the backup destination**:
-- Edit `backup_phone.py` and update the `destination` variable to match your destination path:
-     ```python
-     destination = "/d/downloads/Backup-Pixel6a"  # Update this path as needed
-     ```
+- Copy `.env.example` to `.env`:
+  ```
+  cp .env.example .env
+  ```
+- Edit `.env` and set your backup destination:
+  ```
+  BACKUP_DESTINATION=D:\\downloads\\Backup-Pixel6a
+  ```
+- Use Windows path format with double backslashes (`\\`) or forward slashes (`/`)
 
 3. **Connect your phone**:
    - Connect your Pixel 6a via USB
@@ -52,23 +58,31 @@ python backup_phone.py
 ```
 
 The script will:
-1. Check if your Pixel 6a is connected via ADB
-2. Sync all files from `/sdcard/` to your specified folder
-3. Exclude hidden system files (files starting with `.`)
-4. Display real-time progress
-5. Report completion status
+1. Check if ADB is available and your Pixel 6a is connected
+2. List all entries in `/sdcard/`
+3. Sync each entry individually to your specified destination folder
+4. Exclude hidden system files (files/folders starting with `.`)
+5. Display real-time progress for each entry
+6. Report a summary with success/failure counts
 
 ### Canceling a Backup
 
-Press `Ctrl+C` to cancel the backup operation at any time.
+Press `Ctrl+C` to cancel the backup operation at any time. The script will display a summary of completed backups.
 
 ## Configuration
 
-You can modify the following settings in `backup_phone.py`:
+### Environment Variables (.env file)
 
-- **`source`**: The path on your phone to backup (default: `//sdcard/`)
-- **`destination`**: The local path where backups are saved (default: `/d/downloads/Backup-Pixel6a`)
-- **`--exclude` pattern**: Modify the exclusion pattern to skip different file types
+- **`BACKUP_DESTINATION`**: The local path where backups are saved
+  - Default: `D:\downloads\Backup-Pixel6a`
+  - Example: `BACKUP_DESTINATION=D:\\MyBackups\\Phone` or `BACKUP_DESTINATION=D:/MyBackups/Phone`
+
+### Script Settings
+
+You can modify the following in `backup_phone.py`:
+
+- **`source`**: The path on your phone to backup (default: `/sdcard/`)
+- **`--exclude` pattern**: Modify the exclusion pattern to skip different file types (default: `**/.*`)
 
 ## Troubleshooting
 
@@ -82,8 +96,14 @@ You can modify the following settings in `backup_phone.py`:
 - ADB is not installed or not in your system PATH
 - Install Android SDK Platform Tools and add to PATH
 
-### BetterADBSync Import Error
+### BetterADBSync/adbsync Not Found
 - Run `pip install BetterADBSync` to install the required package
+- Verify installation: `adbsync --version`
+
+### Files Not Appearing in Expected Location
+- Check the script output for "Backup location:" to see where files were saved
+- Ensure you're using proper Windows path format in `.env`: `D:\\path\\to\\folder` or `D:/path/to/folder`
+- Verify the destination folder exists and you have write permissions
 
 ### Permission Denied
 - Ensure you have write permissions to the destination folder
@@ -91,9 +111,10 @@ You can modify the following settings in `backup_phone.py`:
 
 ## Notes
 
-- The script uses `//sdcard/` path format for MinGW/Git Bash compatibility on Windows
+- The script backs up each top-level entry in `/sdcard/` individually for better progress tracking
 - Hidden files and folders (starting with `.`) are excluded by default to avoid backing up system files
 - The backup is incremental - BetterADBSync only transfers new or modified files
+- The `.env` file is gitignored to keep personal paths private
 
 ## License
 

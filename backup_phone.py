@@ -2,16 +2,24 @@
 import sys
 import os
 import shutil
+from dotenv import load_dotenv
 
 def run_backup():
+    # Load environment variables from .env file
+    load_dotenv()
+    
     # 1. Configuration
-    # Note: Using //sdcard/ for MinGW path compatibility
-    source = "//sdcard/"
-    destination = "/d/downloads/Backup-Pixel6a"
+    # Use proper Windows path format
+    # Can be overridden by BACKUP_DESTINATION in .env file
+    destination = os.getenv("BACKUP_DESTINATION", "D:\\downloads\\Backup-Pixel6a")
+    
+    # Ensure the destination directory exists
+    os.makedirs(destination, exist_ok=True)
+    
+    # Source uses Unix-style path for ADB compatibility
+    source = "/sdcard/"
     
     print(f"--- Starting Pixel 6a Backup to {destination} ---")
-    print(f"Current working directory: {os.getcwd()}")
-    print(f"Absolute destination path: {os.path.abspath(destination)}")
 
     # 2. Check if ADB is available
     adb_path = shutil.which("adb")
@@ -106,22 +114,7 @@ def run_backup():
     print(f"Successfully synced: {success_count}")
     print(f"Failed: {failed_count}")
     print(f"Skipped (hidden): {len(entries) - success_count - failed_count}")
-    
-    # Check what was actually created
-    print("\nChecking for created directories...")
-    possible_locations = [
-        destination,
-        os.path.abspath(destination),
-        os.path.join(os.getcwd(), "d", "downloads", "Backup-Pixel6a"),
-        "D:\\downloads\\Backup-Pixel6a"
-    ]
-    
-    for location in possible_locations:
-        if os.path.exists(location):
-            print(f"✓ Found backup at: {location}")
-        else:
-            print(f"✗ Not found: {location}")
-    
+    print(f"\nBackup location: {destination}")
     print("="*60)
 
 if __name__ == "__main__":
