@@ -2,9 +2,123 @@
 import sys
 import os
 import shutil
+import time
+import winsound
 from dotenv import load_dotenv
 
+def check_device_connected():
+    """
+    Check if an Android device is connected via ADB.
+    If not connected, prompts user to connect and retry.
+    Returns True if device is connected, False otherwise.
+    """
+    check_device = subprocess.run(["adb", "get-state"], capture_output=True, text=True)
+    
+    if "device" not in check_device.stdout:
+        print("\n" + "!"*60)
+        print("ERROR: No Pixel detected")
+        print("!"*60)
+        print("\nPlease connect your phone and enable USB debugging.")
+        
+        # Play Windows alert sound (more reliable methods)
+        try:
+            # Try to play the system default beep sound
+            winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
+        except:
+            # Fallback to simple beep if that fails
+            try:
+                winsound.Beep(1000, 500)  # 1000 Hz for 500ms
+            except:
+                # If all else fails, use MessageBeep
+                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+        
+        print("\nPress SPACE to retry after connecting your phone, or press Ctrl+C to cancel...")
+        
+        # Wait for spacebar press
+        while True:
+            if sys.platform == 'win32':
+                import msvcrt
+                if msvcrt.kbhit():
+                    key = msvcrt.getch()
+                    if key == b' ':  # Spacebar
+                        break
+                    elif key == b'\x03':  # Ctrl+C
+                        print("\nBackup cancelled.")
+                        return False
+            time.sleep(0.1)
+        
+        # Retry device check
+        print("\nRetrying device detection...")
+        check_device = subprocess.run(["adb", "get-state"], capture_output=True, text=True)
+        
+        if "device" not in check_device.stdout:
+            print("\n✗ Still no device detected. Please check:")
+            print("  - USB cable is properly connected")
+            print("  - USB debugging is enabled on your phone")
+            print("  - You've authorized this computer on your phone")
+            print("\nRun the script again after resolving these issues.")
+            return False
+        else:
+            print("✓ Device detected! Continuing with backup...\n")
+    
+    return True
+
+def get_phone_storage_info():
+    """
+    Get storage information from the phone.
+    Returns a tuple of (total_gb, used_gb, free_gb) or (None, None, None) if failed.
+    """
+    try:
+        # Use 'df' command to get storage info for /sdcard
+        result = subprocess.run(
+            ["adb", "shell", "df", "/sdcard"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode == 0:
+            # Parse the output (format varies, but typically last line has the data)
+            lines = result.stdout.strip().split('\n')
+            if len(lines) >= 2:
+                # Usually second line has the actual data
+                data_line = lines[-1].split()
+                if len(data_line) >= 4:
+                    # Convert from KB to GB (df typically shows in KB or blocks)
+                    # Format is usually: Filesystem  Size  Used  Avail  Use%  Mounted
+                    # We need to handle different formats
+                    try:
+                        # Try to parse the size values (could be in K, M, G format)
+                        def parse_size(size_str):
+                            """Convert size string (like '10G', '512M') to GB"""
+                            size_str = size_str.strip()
+                            if size_str.endswith('G'):
+                                return float(size_str[:-1])
+                            elif size_str.endswith('M'):
+                                return float(size_str[:-1]) / 1024
+                            elif size_str.endswith('K'):
+                                return float(size_str[:-1]) / (1024 * 1024)
+                            else:
+                                # Assume it's in KB (1K blocks)
+                                return float(size_str) / (1024 * 1024)
+                        
+                        total = parse_size(data_line[1])
+                        used = parse_size(data_line[2])
+                        free = parse_size(data_line[3])
+                        
+                        return (total, used, free)
+                    except (ValueError, IndexError):
+                        pass
+        
+        return (None, None, None)
+    except Exception as e:
+        print(f"Warning: Could not retrieve storage info: {e}")
+        return (None, None, None)
+
 def run_backup():
+    # Start timing
+    start_time = time.time()
+    
     # Load environment variables from .env file
     load_dotenv()
     
@@ -32,10 +146,7 @@ def run_backup():
     print(f"Using ADB from: {adb_path}")
 
     # 3. Check if device is connected via ADB
-    check_device = subprocess.run(["adb", "get-state"], capture_output=True, text=True)
-    
-    if "device" not in check_device.stdout:
-        print("Error: No Pixel detected. Please connect your phone and enable USB debugging.")
+    if not check_device_connected():
         return
 
     # 4. List contents of /sdcard/
@@ -101,11 +212,21 @@ def run_backup():
                 
         except KeyboardInterrupt:
             print("\n\nBackup cancelled by user.")
+            elapsed_time = time.time() - start_time
+            minutes, seconds = divmod(int(elapsed_time), 60)
             print(f"\nSummary: {success_count} succeeded, {failed_count} failed, {len(entries) - success_count - failed_count} not processed")
+            print(f"Time elapsed: {minutes} minutes, {seconds} seconds")
             return
         except Exception as e:
             print(f"✗ Error syncing {entry}: {e}")
             failed_count += 1
+    
+    # Calculate elapsed time
+    elapsed_time = time.time() - start_time
+    minutes, seconds = divmod(int(elapsed_time), 60)
+    
+    # Get phone storage information
+    total_gb, used_gb, free_gb = get_phone_storage_info()
     
     # 6. Print summary
     print("\n" + "="*60)
@@ -115,6 +236,15 @@ def run_backup():
     print(f"Failed: {failed_count}")
     print(f"Skipped (hidden): {len(entries) - success_count - failed_count}")
     print(f"\nBackup location: {destination}")
+    print(f"Time elapsed: {minutes} minutes, {seconds} seconds")
+    
+    # Display phone storage info
+    if total_gb is not None:
+        print(f"\nPhone Storage:")
+        print(f"  Total: {total_gb:.2f} GB")
+        print(f"  Used: {used_gb:.2f} GB ({(used_gb/total_gb*100):.1f}%)")
+        print(f"  Free: {free_gb:.2f} GB ({(free_gb/total_gb*100):.1f}%)")
+    
     print("="*60)
 
 if __name__ == "__main__":
