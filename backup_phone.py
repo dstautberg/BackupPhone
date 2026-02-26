@@ -5,6 +5,7 @@ import shutil
 import time
 import winsound
 from dotenv import load_dotenv
+from datetime import datetime
 
 def check_device_connected():
     """
@@ -117,7 +118,7 @@ def get_phone_storage_info():
 
 def run_backup():
     # Start timing
-    start_time = time.time()
+    start_time = datetime.now()
     
     # Load environment variables from .env file
     load_dotenv()
@@ -171,13 +172,12 @@ def run_backup():
     print("\n--- Starting backup process ---\n")
 
     # 5. Loop through each entry and sync it
-    success_count = 0
-    failed_count = 0
-    
+    success, failed, skipped = [], [], []
     for entry in entries:
         # Skip hidden files/folders (starting with .)
         if entry.startswith('.'):
             print(f"Skipping hidden entry: {entry}")
+            skipped.append(entry)
             continue
         
         entry_source = f"/sdcard/{entry}"
@@ -205,16 +205,16 @@ def run_backup():
             
             if process.returncode == 0:
                 print(f"✓ Successfully synced: {entry}")
-                success_count += 1
+                success.append(entry)
             else:
                 print(f"✗ Failed to sync: {entry} (exit code {process.returncode})")
-                failed_count += 1
+                failed.append(entry)
                 
         except KeyboardInterrupt:
             print("\n\nBackup cancelled by user.")
-            elapsed_time = time.time() - start_time
+            elapsed_time = datetime.now() - start_time
             minutes, seconds = divmod(int(elapsed_time), 60)
-            print(f"\nSummary: {success_count} succeeded, {failed_count} failed, {len(entries) - success_count - failed_count} not processed")
+            print(f"\nSummary: {len(success)} succeeded, {len(failed)} failed, {len(skipped)} not processed")
             print(f"Time elapsed: {minutes} minutes, {seconds} seconds")
             return
         except Exception as e:
@@ -222,30 +222,35 @@ def run_backup():
             failed_count += 1
     
     # Calculate elapsed time
-    elapsed_time = time.time() - start_time
-    minutes, seconds = divmod(int(elapsed_time), 60)
+    elapsed_time = datetime.now() - start_time
+    
+    total_seconds = int(elapsed_time.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
     
     # Get phone storage information
     total_gb, used_gb, free_gb = get_phone_storage_info()
     
     # 6. Print summary
-    print("\n" + "="*60)
-    print("--- Backup Completed ---")
-    print(f"Total entries: {len(entries)}")
-    print(f"Successfully synced: {success_count}")
-    print(f"Failed: {failed_count}")
-    print(f"Skipped (hidden): {len(entries) - success_count - failed_count}")
-    print(f"\nBackup location: {destination}")
-    print(f"Time elapsed: {minutes} minutes, {seconds} seconds")
+    summary = "\n" + "="*60 + "\n"
+    summary += f"Backup Started:  {start_time.strftime("%Y-%m-%d %H:%M:%S")}\n"
+    summary += f"Backup location: {destination}\n"
+    summary += f"Elapsed Time:    {hours:02}:{minutes:02}:{seconds:02}\n"
+    summary += f"Total entries:   {len(entries)}\n"
+    summary += f"Synced:          {success}\n"
+    summary += f"Failed:          {failed}\n"
+    summary += f"Skipped:         {skipped}\n"
     
     # Display phone storage info
     if total_gb is not None:
-        print(f"\nPhone Storage:")
-        print(f"  Total: {total_gb:.2f} GB")
-        print(f"  Used: {used_gb:.2f} GB ({(used_gb/total_gb*100):.1f}%)")
-        print(f"  Free: {free_gb:.2f} GB ({(free_gb/total_gb*100):.1f}%)")
+        summary += f"Phone Storage:\n"
+        summary += f"  Total: {total_gb:.2f} GB\n"
+        summary += f"  Used:  {used_gb:.2f} GB ({(used_gb/total_gb*100):.1f}%)\n"
+        summary += f"  Free:  {free_gb:.2f} GB ({(free_gb/total_gb*100):.1f}%)\n"
     
-    print("="*60)
+    summary += "="*60 + "\n"
+    print(summary)
+    open(f"{sys.argv[0]}.log", 'a+').write(summary)
 
 if __name__ == "__main__":
     run_backup()
