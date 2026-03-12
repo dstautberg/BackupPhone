@@ -123,19 +123,23 @@ def run_backup():
     # Load environment variables from .env file
     load_dotenv()
     
-    # 1. Configuration
-    # Use proper Windows path format
-    # Can be overridden by BACKUP_DESTINATION in .env file
-    destination = os.getenv("BACKUP_DESTINATION", "D:\\downloads\\Backup-Pixel6a")
-    
-    # Ensure the destination directory exists
-    os.makedirs(destination, exist_ok=True)
-    
+    destinations = []
+    i = 1
+    while True:
+        dest = os.getenv(f"BACKUP_DESTINATION_{i}")
+        if not dest:
+            break
+        try:
+            os.makedirs(dest, exist_ok=True)
+            destinations.append(dest)
+            print(f"Created backup destination '{dest}'.")
+        except Exception as e:
+            print(f"Error creating backup destination '{dest}': {e}")
+        i += 1
+        
     # Source uses Unix-style path for ADB compatibility
     source = "/sdcard/"
     
-    print(f"--- Starting Pixel 6a Backup to {destination} ---")
-
     # 2. Check if ADB is available
     adb_path = shutil.which("adb")
     if not adb_path:
@@ -143,7 +147,6 @@ def run_backup():
         print("Please install Android Platform Tools from:")
         print("https://developer.android.com/studio/releases/platform-tools")
         return
-    
     print(f"Using ADB from: {adb_path}")
 
     # 3. Check if device is connected via ADB
@@ -169,57 +172,56 @@ def run_backup():
     for entry in entries:
         print(f"  - {entry}")
     
-    print("\n--- Starting backup process ---\n")
-
-    # 5. Loop through each entry and sync it
     success, failed, skipped = [], [], []
-    for entry in entries:
-        # Skip hidden files/folders (starting with .)
-        if entry.startswith('.'):
-            print(f"Skipping hidden entry: {entry}")
-            skipped.append(entry)
-            continue
-        
-        entry_source = f"/sdcard/{entry}"
-        entry_dest = destination
-        
-        print(f"\n>>> Syncing: {entry}")
-        
-        # Construct the adbsync command for this entry
-        cmd = [
-            "adbsync",
-            "--exclude", "**/.*",  # Skip hidden system files
-            "pull",
-            entry_source, 
-            entry_dest
-        ]
-        
-        try:
-            # Execute the sync for this entry
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+    for destination in destinations:
+        print(f"\n--- Starting Pixel 6a Backup to {destination} ---")
+
+        # 5. Loop through each entry and sync it
+        for entry in entries:
+            entry_source = f"/sdcard/{entry}"
+            entry_dest = destination
             
-            for line in process.stdout:
-                print(line, end="")
-                
-            process.wait()
+            print(f"\n>>> Syncing: {entry}")
             
-            if process.returncode == 0:
-                print(f"✓ Successfully synced: {entry}")
-                success.append(entry)
-            else:
-                print(f"✗ Failed to sync: {entry} (exit code {process.returncode})")
-                failed.append(entry)
+            # Construct the adbsync command with specific folder exclusions
+            cmd = [
+                "adbsync",
+                "--exclude", "**/.*",              # Skip hidden files
+                "--exclude", "Android/data/**",    # Recursive skip of private app data
+                "--exclude", "Android/obb/**",     # Recursive skip of large game blobs
+                "pull",
+                entry_source, 
+                entry_dest
+            ]            
+
+            try:
+                # Execute the sync for this entry
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 
-        except KeyboardInterrupt:
-            print("\n\nBackup cancelled by user.")
-            elapsed_time = datetime.now() - start_time
-            minutes, seconds = divmod(int(elapsed_time), 60)
-            print(f"\nSummary: {len(success)} succeeded, {len(failed)} failed, {len(skipped)} not processed")
-            print(f"Time elapsed: {minutes} minutes, {seconds} seconds")
-            return
-        except Exception as e:
-            print(f"✗ Error syncing {entry}: {e}")
-            failed_count += 1
+                for line in process.stdout:
+                    print(line, end="")
+                    
+                process.wait()
+                
+                if process.returncode == 0:
+                    print(f"Successfully synced: {entry}")
+                    success.append(entry)
+                else:
+                    msg = f"Failed to sync: {entry} (exit code {process.returncode})"
+                    print(msg)
+                    failed.append(msg)
+                    
+            except KeyboardInterrupt:
+                print("\n\nBackup cancelled by user.")
+                elapsed_time = datetime.now() - start_time
+                minutes, seconds = divmod(int(elapsed_time), 60)
+                print(f"\nSummary: {len(success)} succeeded, {len(failed)} failed, {len(skipped)} not processed")
+                print(f"Time elapsed: {minutes} minutes, {seconds} seconds")
+                return
+            except Exception as e:
+                print(f"✗ Error syncing {entry}: {e}")
+                failed_count += 1
     
     # Calculate elapsed time
     elapsed_time = datetime.now() - start_time
@@ -233,13 +235,13 @@ def run_backup():
     
     # 6. Print summary
     summary = "\n" + "="*60 + "\n"
-    summary += f"Backup Started:  {start_time.strftime("%Y-%m-%d %H:%M:%S")}\n"
-    summary += f"Backup location: {destination}\n"
-    summary += f"Elapsed Time:    {hours:02}:{minutes:02}:{seconds:02}\n"
-    summary += f"Total entries:   {len(entries)}\n"
-    summary += f"Synced:          {success}\n"
-    summary += f"Failed:          {failed}\n"
-    summary += f"Skipped:         {skipped}\n"
+    summary += f"Backup locations: {destinations}\n"
+    summary += f"Backup Started:   {start_time.strftime("%Y-%m-%d %H:%M:%S")}\n"
+    summary += f"Elapsed Time:     {hours:02}:{minutes:02}:{seconds:02}\n"
+    summary += f"Total entries:    {len(entries)}\n"
+    summary += f"Skipped:          {skipped}\n"
+    summary += f"Synced:           {success}\n"
+    summary += f"Failed:           {failed}\n"
     
     # Display phone storage info
     if total_gb is not None:
