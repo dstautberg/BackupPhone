@@ -179,6 +179,11 @@ def run_backup():
 
         # 5. Loop through each entry and sync it
         for entry in entries:
+            if entry in ["Android"]:
+                print(f"Skipping '{entry}'")
+                skipped.append(entry)
+                continue
+            
             entry_source = f"/sdcard/{entry}"
             entry_dest = destination
             
