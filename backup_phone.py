@@ -174,20 +174,17 @@ def run_backup():
     
     success, failed, skipped = [], [], []
 
-    for destination in destinations:
-        print(f"\n--- Starting Pixel 6a Backup to {destination} ---")
+    # Loop through each entry and sync it
+    for entry in entries:
+        if entry in ["Android"]:
+            print(f"Skipping '{entry}'")
+            skipped.append(entry)
+            continue
 
-        # 5. Loop through each entry and sync it
-        for entry in entries:
-            if entry in ["Android"]:
-                print(f"Skipping '{entry}'")
-                skipped.append(entry)
-                continue
-            
+        for destination in destinations:
             entry_source = f"/sdcard/{entry}"
             entry_dest = destination
-            
-            print(f"\n>>> Syncing: {entry}")
+            print(f"\n>>> Syncing: {entry} to {entry_dest}")
             
             # Construct the adbsync command with specific folder exclusions
             cmd = [
@@ -211,9 +208,9 @@ def run_backup():
                 
                 if process.returncode == 0:
                     print(f"Successfully synced: {entry}")
-                    success.append(entry)
+                    if entry not in success: success.append(entry)
                 else:
-                    msg = f"Failed to sync: {entry} (exit code {process.returncode})"
+                    msg = f"Failed to sync: {entry} to {entry_dest} (Exit code: {process.returncode})"
                     print(msg)
                     failed.append(msg)
                     
